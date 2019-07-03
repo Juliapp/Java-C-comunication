@@ -1,12 +1,13 @@
 package testserver;
 
+import comunicacao.ThreadConexao;
+
 public class TestServer {
 
-    /**
-     * @param args the command line arguments
-     */
     public static void main(String[] args) {
-        // TODO code application logic here
+        ThreadConexao a = new ThreadConexao();
+        ThreadConexao b = new ThreadConexao();
+                
     }
     
 }
