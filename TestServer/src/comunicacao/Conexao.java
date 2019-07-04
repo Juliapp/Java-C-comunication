@@ -38,6 +38,7 @@ public class Conexao{
     
         private Socket esperandoConexao() throws IOException {
         //Faz o serverSocket esperar uma conexão, só da o retorno quando a conexão não é estabelecida
+        System.out.println("Esperando a resposta do cliente .....");
         Socket socket = serverSocket.accept();
         System.out.println("conexão estabelecida com o cliente");
         return socket;

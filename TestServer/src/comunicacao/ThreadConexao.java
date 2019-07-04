@@ -7,6 +7,8 @@ import java.util.logging.Logger;
 
 public class ThreadConexao{
     private Conexao c;
+    
+    
     public ThreadConexao() {
          
         new Thread() {
