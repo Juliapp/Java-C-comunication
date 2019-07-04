@@ -1,124 +1,131 @@
+/*
+ * ============================================================================
+ *
+ *       Filename:  client.c
+ *
+ *    Description:  Simple protocol client implementation
+ *
+ *        Version:  0.1
+ *        Created:  08/02/2017 10:55:44 PM
+ *       Compiler:  gcc
+ *
+ *         Author:  Gustavo Pantuza (gustavopantuza@gmail.com)
+ *   Organization:  Computer science community
+ *
+ * ============================================================================
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
-/*Headers para o socket*/
-
-//#include <sys/socket.h>
-/*
 #include <sys/types.h>
-
-#ifdef __WIN32__
-# include <winsock2.h>
-#else
-# include <sys/socket.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
-#endif
-*/
-
-#ifndef _WIN32
-#include <netinet/in.h>
-#include <unistd.h>
-#include <netdb.h>
 #include <arpa/inet.h>
-#include <sys/time.h>
-#include <sys/wait.h>
-#else
-#include <winsock.h>
-#include <time.h>
-#endif
 
-#define PORTA 5555
+
+
+/* Defines the server port */
+#define PORT 4242
+
+
+/* Sockets buffers length */
 #define LEN 4096
 
-struct sockaddr_in local;
-struct sockaddr_in remoto;
 
-int main(){
-	
-	
-	int sockfd; /*descritor de dados - ler e enviar*/
-	int client;
-	int len = sizeof(remoto);
-	char buffer[4096];
-	int slen;
-	
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	
-	/*Teste para ver se o socket funciona*/
-	testeDeSocket(sockfd);
-	
-	local.sin_family 	= AF_NET;
-	local.sin_port		= htons(PORTA);
-	
-	//DEFINIR O IP
-	//local.sin_addr.s_addr		= inet_addr(IP);
-	
-	memset(local.sin_zero, 0x0, 8);
-	
-	testeBind( bind(sockfd, (struct sockaddr*)&local, sizeof(local) ) );
-	
-	//ouvindo o socket
-	listen(sockfd, 1);
-	
-	if(client = acept(sockfd, (struct sockaddr*)&remoto, &len) == -1){
-		perror("acept");
-		exit(1);
-	}
-	
-	
-	
-	
-	
-	strcpy(buffer, "Welcome\n\0");
-	
-	if(send(client, buffer, strlen(buffer), 0)){
-		print("Aguardando a resposta do cliente");
-		while(1){
-			
-			memset(buffer, 0x0, LEN);
-			if(slen = recv(client, buffer, LEN, 0) > 0 ){	
-				buffer[slen] = '\0';		
-				printf("Mensagem Recebida: %s\n",buffer ); 
-				close(client);
-				break;
-			} 
-			
-		}
-	}
-	
-	close(sockfd);
-	printf("Servidor Encerrado");
-	
-	return 0;
+/* Server address */
+#define SERVER_ADDR "172.16.103.209"
+
+
+
+/*
+ * Main execution of the client program of our simple protocol
+ */
+int
+main(int argc, char *argv[]) {
+
+    /* Server socket */
+    struct sockaddr_in server;
+    /* Client file descriptor for the local socket */
+    int sockfd;
+
+    int len = sizeof(server);
+    int slen;
+
+    /* Receive buffer */
+    char buffer_in[LEN];
+    /* Send buffer */
+    char buffer_out[LEN];
+
+
+    fprintf(stdout, "Starting Client ...\n");
+
+
+    /*
+     * Creates a socket for the client
+     */
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("Error on client socket creation:");
+        return EXIT_FAILURE;
+    }
+    fprintf(stdout, "Client socket created with fd: %d\n", sockfd);
+
+
+    /* Defines the connection properties */
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
+    server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    memset(server.sin_zero, 0x0, 8);
+
+
+    /* Tries to connect to the server */
+    if (connect(sockfd, (struct sockaddr*) &server, len) == -1) {
+        perror("Can't connect to server");
+        return EXIT_FAILURE;
+    }
+
+
+    /* Receives the presentation message from the server */
+    if ((slen = recv(sockfd, buffer_in, LEN, 0)) > 0) {
+        buffer_in[slen + 1] = '\0';
+        fprintf(stdout, "Server says: %s\n", buffer_in);
+    }
+
+
+    /*
+     * Commuicate with the server until the exit message come
+     */
+    while (true) {
+
+        /* Zeroing the buffers */
+        memset(buffer_in, 0x0, LEN);
+        memset(buffer_out, 0x0, LEN);
+
+        fprintf(stdout, "Say something to the server: ");
+        fgets(buffer_out, LEN, stdin);
+
+        /* Sends the read message to the server through the socket */
+        send(sockfd, buffer_out, strlen(buffer_out), 0);
+
+        /* Receives an answer from the server */
+        slen = recv(sockfd, buffer_in, LEN, 0);
+        printf("Server answer: %s\n", buffer_in);
+
+        /* 'bye' message finishes the connection */
+        if(strcmp(buffer_in, "bye") == 0)
+            break;
+    }
+
+
+    /* Close the connection whith the server */
+    close(sockfd);
+
+    fprintf(stdout, "\nConnection closed\n\n");
+
+    return EXIT_SUCCESS;
 }
-
-void testeDeSocket(int sockfd){
-	if(sockfd == -1){
-		perror("Erro na criação do Socket");
-		exit(1);
-	}else
-		printf("Socket criado com Sucesso!\n");
-}
-
-void testeBind(Bind b){
-	if(b == -1){
-		perror("Bind");
-		exit(1);
-	}
-}
-
-
-
-	/*MACRO CONSTANTES
-	DOMAIN ----------
-	AF_INET - ipv4
-	
-	TYPE ------------
-	SOCK_STREAM - TCP
-	SOCK_DGRAM - UDP
-	
-	PROTOCOL--------
-	0 -ip
-	*/
