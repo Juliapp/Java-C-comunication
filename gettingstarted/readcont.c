@@ -13,6 +13,11 @@
 #include <stdarg.h>
 #include <string.h>
 #include <inttypes.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include<arpa/inet.h>
 
 #ifndef BARE_METAL
 #if WIN32
@@ -24,13 +29,18 @@
 #define USE_TRANSPORT_LISTENER 0
 #endif
 #define PRINT_TAG_METADATA 0
-#define numberof(x) (sizeof((x))/sizeof((x)[0]))
+#define MAX 100
+#define SA struct sockaddr
+
+#define IPSERVER '172.16.103.4'
+#define PORT 12345
 
 #define usage() {errx(1, "read readerURL [--ant antenna_list] [--pow read_power]\n"\
                          "Please provide reader URL, such as:\n"\
                          "tmr:///com4 or tmr:///com4 --ant 1,2 --pow 2300\n"\
                          "tmr://my-reader.example.com or tmr://my-reader.example.com --ant 1,2 --pow 2300\n"\
                          );}
+typedef unsigned char BYTE;
 
 void errx(int exitval, const char *fmt, ...)
 {
@@ -112,8 +122,122 @@ void parseAntennaList(uint8_t *antenna, uint8_t *antennaCount, char *args)
 }
 #endif
 
+void conectarSever(int* sockfd){
+   // int connfd;
+    struct sockaddr_in servaddr;// cli;
+
+    // socket create and varification
+   *sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (*sockfd == -1) {
+        printf("socket creation failed...\n");
+        exit(0);
+    }
+    else
+        printf("Socket successfully created..\n");
+    bzero(&servaddr, sizeof(servaddr));
+
+    // assign IP, PORT
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(IPSERVER);
+    servaddr.sin_port = htons(PORT);
+
+    // connect the client socket to server socket
+    if (connect(*sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
+        printf("connection with the server failed...\n");
+        exit(0);
+    }
+    else
+        printf("connected to the server..\n");
+}
+
+//function to convert string to byte array
+void string2ByteArray(char* input, BYTE* output)
+{
+    int loop;
+    int i;
+
+    loop = 0;
+    i = 0;
+
+    while(input[loop] != '\0')
+    {
+        output[i++] = input[loop++];
+    }
+}
+
+void func(int sockfd , char* pacote)
+{
+    //char buff[MAX];
+    //int n;
+    int len = strlen(pacote);
+    BYTE arr[len];
+    //converting string to BYTE[]
+    string2ByteArray(pacote,arr);
+    write(sockfd, arr, sizeof(arr));
+        bzero(arr, sizeof(arr));
+        //read(sockfd, buff, sizeof(buff));
+        //printf("From Server : %s", buff);
+        //if ((strncmp(buff, "exit", 4)) == 0) {
+        //    printf("Client Exit...\n");
+        //    break;
+        //}
+}
+
+char **split(char frase[], char separador)
+{
+    int i, j, k, contsep = 0;
+    for(i=0,contsep=0;i<strlen(frase);i++)
+      if(frase[i] == separador)
+        contsep++;
+
+    char  aux[contsep][20];
+    char **result = (char**)malloc(contsep*sizeof(char));
+    if(contsep)
+    {
+        for(i=0; i<=contsep; i++ )
+          *(result + i) = (char*)malloc(40*sizeof(char));
+
+        for(i=0,k=0,j=0; i < strlen(frase); i++)
+           if(frase[i] != separador)
+           {
+              aux[k][j] = frase[i];
+              j++;
+           }
+           else
+           {
+              aux[k][j] = 0;
+              k++;
+              j=0;
+           }
+        aux[k][j] = 0;
+
+        for(i=0;i<=contsep;i++)
+          *(result+i) = strcpy(*(result+i), aux[i]);
+
+        return result;
+    }
+    else
+        printf("Nenhum Separador Encontrado");
+    return NULL;
+}
+
+void pacote(char time[] , int sockfd , char package[]){
+  char  delim = 'T';
+  char **primeiro = split(time, delim);
+  char delim2= '.';
+  char **segunda = split(primeiro[1], delim2);
+  printf("Timestamp : %s\n", time);
+  strcat(package,segunda[0]);
+  printf("package : %s\n", package);
+  func(sockfd,package);
+}
+
+
 int main(int argc, char *argv[])
 {
+  char package[100] = "41;";
+  int sockfd;
+  conectarSever(&sockfd);
   TMR_Reader r, *rp;
   TMR_Status ret;
   TMR_ReadPlan plan;
@@ -386,6 +510,16 @@ if (TMR_ERROR_TAG_ID_BUFFER_FULL == ret)
         }
 #else
     {
+        
+      char chavec '{';
+      char chavef '}';
+      char pvirg ';';
+      char virg ',';
+      char igual ':';
+      char[] horas = 'horas';
+      char[] minutos = 'minutos';
+      char[] segundos = 'segundos';     
+         
       uint8_t shift;
       uint64_t timestamp;
       time_t seconds;
@@ -412,17 +546,32 @@ if (TMR_ERROR_TAG_ID_BUFFER_FULL == ret)
       end += strftime(end, timeEnd-end, "%z", localtime(&seconds));
     }
 #endif
+    for(int i=0;i < 100; i++){
+      if(package[i] == ';'){
+        package[i+1] = '\0';
+        break;
+      }
+    }
+    char virgula[1] ;
+    virgula[0] = ';';
+    strcat(package , epcStr);
+    strcat(package,virgula);
+    pacote(timeStr,sockfd,package);
 
-    printf("EPC:%s ", epcStr);
 // Enable PRINT_TAG_METADATA Flags to print Metadata value
 #if PRINT_TAG_METADATA
 {
+  conectarSever();
   uint16_t j = 0;
   printf("\n");
   for (j=0; (1<<j) <= TMR_TRD_METADATA_FLAG_MAX; j++)
     {
         if ((TMR_TRD_MetadataFlag)trd.metadataFlags & (1<<j))
         {
+            if (pacoteSensor == NULL)
+            {
+              goto end;
+            }
             switch ((TMR_TRD_MetadataFlag)trd.metadataFlags & (1<<j))
             {
             case TMR_TRD_METADATA_FLAG_READCOUNT:
